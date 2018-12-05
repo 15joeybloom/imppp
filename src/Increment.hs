@@ -1,15 +1,26 @@
 module Increment where
 
+import           Control.Monad.Except
 import           Control.Monad.State
 import qualified Data.Map.Strict         as M
 
 type M =
-    State Store
+    StateT Store (Except ImpError)
 
 type Name = String
 
 newtype Store = Store { getStore :: M.Map Name Integer }
     deriving Show
+
+data ImpError = ImpError
+    { store :: Store
+    , message :: String
+    }
+
+impError :: String -> M a
+impError message = do
+    store <- get
+    throwError $ ImpError { store, message }
 
 data AExp
     = I Integer
@@ -34,13 +45,16 @@ data Stmt
 data Pgm
     = Pgm [Name] Stmt
 
-interpAExp :: AExp -> M Integer
-interpAExp (I i) = return i
-interpAExp (Var x) = do
+storeLookup :: Name -> M Integer
+storeLookup x = do
     Store store <- get
     case M.lookup x store of
         Just i -> return i
-        Nothing -> error $ x ++ " uninitialized!"
+        Nothing -> impError $ x ++ " uninitialized!"
+
+interpAExp :: AExp -> M Integer
+interpAExp (I i) = return i
+interpAExp (Var x) = storeLookup x
 interpAExp (Negate e) = do
     i <- interpAExp e
     return $ -i
@@ -52,7 +66,7 @@ interpAExp (Div e1 e2) = do
     i1 <- interpAExp e1
     i2 <- interpAExp e2
     if i2 == 0
-        then error "Division by zero!"
+        then impError "Division by zero!"
         else return $ quot i1 i2
 interpAExp (Inc x) = do
     i <- interpAExp $ Var x
@@ -76,6 +90,7 @@ interpBExp (And e1 e2) = do
 
 interpStmt :: Stmt -> M ()
 interpStmt (Assign x e) = do
+    _ <- storeLookup x --make sure x is declared
     i <- interpAExp e
     modify $ Store . M.insert x i . getStore
 interpStmt (If c t e) = do
@@ -88,7 +103,7 @@ interpStmt (Stmts (s:rest)) = do
     interpStmt s
     interpStmt $ Stmts rest
 
-runPgm :: Pgm -> Store
-runPgm (Pgm ids body) = execState
+runPgm :: Pgm -> Either ImpError Store
+runPgm (Pgm ids body) = runExcept $ execStateT
     (interpStmt body)
     (Store $ M.fromList [(x, 0) | x <- ids])

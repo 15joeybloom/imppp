@@ -13,9 +13,29 @@ tests = testGroup "Tests" [unitTests]
 unitTests :: TestTree
 unitTests = testGroup "Unit tests"
     [ testCase "sum" $ do
-        let Store state = runPgm sumPgm
-        M.lookup "n" state @?= Just 0
-        M.lookup "sum" state @?= Just 5050
+        let Right (Store store) = runPgm sumPgm
+        M.lookup "n" store @?= Just 0
+        M.lookup "sum" store @?= Just 5050
+    , testCase "uninitialized access" $ do
+        let
+            Left (ImpError { store = Store store, message }) =
+                runPgm uninitializedAccessPgm
+        M.lookup "x" store @?= Just 0
+        M.lookup "xx" store @?= Nothing
+        message @?= "xx uninitialized!"
+    , testCase "uninitialized assignment" $ do
+        let
+            Left (ImpError { store = Store store, message }) =
+                runPgm uninitializedAssignPgm
+        M.lookup "x" store @?= Just 1
+        M.lookup "xx" store @?= Nothing
+        message @?= "xx uninitialized!"
+    , testCase "division by zero" $ do
+        let
+            Left (ImpError { store = Store store, message }) =
+                runPgm divZeroPgm
+        M.lookup "x" store @?= Just 0
+        message @?= "Division by zero!"
     ]
 
 sumPgm :: Pgm
@@ -26,4 +46,19 @@ sumPgm = Pgm ["n", "sum"] $ Stmts
         [ Assign "sum" (Plus (Var "sum") (Var "n"))
         , Assign "n" (Plus (Var "n") (I (-1)))
         ]
+    ]
+
+uninitializedAccessPgm :: Pgm
+uninitializedAccessPgm = Pgm ["x"] $ Assign "x" (Var "xx")
+
+uninitializedAssignPgm :: Pgm
+uninitializedAssignPgm = Pgm ["x"] $ Stmts
+    [ Assign "x" (I 1)
+    , Assign "xx" (I 2)
+    ]
+
+divZeroPgm :: Pgm
+divZeroPgm = Pgm ["x"] $ Stmts
+    [ Assign "x" (Div (Var "x") (I 0))
+    , Assign "x" (I 1)
     ]

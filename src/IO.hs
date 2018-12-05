@@ -6,12 +6,13 @@ module IO where
 import Prelude hiding (print)
 
 import           Control.Lens
-import           Control.Monad.State
+import           Control.Monad.Except
+import           Control.Monad.State hiding (state)
 import           Control.Monad.Writer
 import qualified Data.Map.Strict         as M
 
 type M =
-    StateT ImpState (Writer String)
+    StateT ImpState (ExceptT ImpError (Writer String))
 
 type Name = String
 
@@ -20,6 +21,16 @@ data ImpState = ImpState
     , store :: !(M.Map Name Integer)
     }
     deriving Show
+
+data ImpError = ImpError
+    { state :: ImpState
+    , message :: String
+    }
+
+impError :: String -> M a
+impError message = do
+    state <- get
+    throwError $ ImpError { state, message }
 
 makeLensesFor [("input", "inputLens"), ("store", "storeLens")] ''ImpState
 
@@ -55,13 +66,16 @@ data Stmt
 data Pgm
     = Pgm [Name] Stmt
 
-interpAExp :: AExp -> M Integer
-interpAExp (I i) = return i
-interpAExp (Var x) = do
+storeLookup :: Name -> M Integer
+storeLookup x = do
     store <- use storeLens
     case M.lookup x store of
         Just i -> return i
-        Nothing -> error $ x ++ " uninitialized!"
+        Nothing -> impError $ x ++ " uninitialized!"
+
+interpAExp :: AExp -> M Integer
+interpAExp (I i) = return i
+interpAExp (Var x) = storeLookup x
 interpAExp (Negate e) = do
     i <- interpAExp e
     return $ -i
@@ -73,12 +87,12 @@ interpAExp (Div e1 e2) = do
     i1 <- interpAExp e1
     i2 <- interpAExp e2
     if i2 == 0
-        then error "Division by zero!"
+        then impError "Division by zero!"
         else return $ quot i1 i2
 interpAExp Read = do
     input <- use inputLens
     case input of
-        [] -> error "Not enough input!"
+        [] -> impError "Not enough input!"
         (x:xs) -> do
             inputLens .= xs
             return x
@@ -100,6 +114,7 @@ interpBExp (And e1 e2) = do
 
 interpStmt :: Stmt -> M ()
 interpStmt (Assign x e) = do
+    _ <- storeLookup x --make sure x is declared
     i <- interpAExp e
     storeLens %= M.insert x i
 interpStmt (If c t e) = do
@@ -112,10 +127,12 @@ interpStmt (Stmts (s:rest)) = do
     interpStmt s
     interpStmt $ Stmts rest
 interpStmt (Print items) = mapM_ (\(Printable p) -> print p) items
-    
 
-runPgm :: Pgm -> [Integer] -> (ImpState, String)
-runPgm (Pgm ids body) input = runWriter $ execStateT (interpStmt body) ImpState
-    { store = M.fromList [(x, 0) | x <- ids]
-    , input
-    }
+runPgm :: Pgm -> [Integer] -> (Either ImpError ImpState, String)
+runPgm (Pgm ids body) input = runWriter $ runExceptT $ execStateT
+    (interpStmt body) startState
+  where
+    startState = ImpState
+        { store = M.fromList [(x, 0) | x <- ids]
+        , input
+        }
