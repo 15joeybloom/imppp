@@ -1,0 +1,39 @@
+name:                imppp
+version:             0.1.0.0
+github:              "15joeybloom/imppp"
+license:             BSD3
+author:              "Joey Bloom"
+
+dependencies:
+- base >= 4.7 && < 5
+
+library:
+  source-dirs: src
+  dependencies:
+    - containers
+    - deepseq
+    - lens
+    - mtl
+
+tests:
+  imppp-test:
+    main:                Spec.hs
+    source-dirs:         test
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - containers
+    - imppp
+    - tasty
+    - tasty-hunit
+
+default-extensions:
+  BangPatterns
+  DeriveGeneric
+  FlexibleContexts
+  FlexibleInstances
+  LambdaCase
+  MultiParamTypeClasses
+  NamedFieldPuns
