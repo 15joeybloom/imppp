@@ -23,8 +23,8 @@ data ImpState = ImpState
     deriving Show
 
 data ImpError = ImpError
-    { state :: ImpState
-    , message :: String
+    { state :: !ImpState
+    , message :: !String
     }
 
 impError :: String -> M a
@@ -35,20 +35,20 @@ impError message = do
 makeLensesFor [("input", "inputLens"), ("store", "storeLens")] ''ImpState
 
 data AExp
-    = I Integer
-    | Var Name
-    | Negate AExp
-    | Div AExp AExp
-    | Plus AExp AExp
+    = I !Integer
+    | Var !Name
+    | Negate !AExp
+    | Div !AExp !AExp
+    | Plus !AExp !AExp
     | Read
 
 data BExp
-    = B Bool
-    | Leq AExp AExp
-    | Not BExp
-    | And BExp BExp
+    = B !Bool
+    | Leq !AExp !AExp
+    | Not !BExp
+    | And !BExp !BExp
 
-data Printable = forall a. PrintableClass a => Printable a
+data Printable = forall a. PrintableClass a => Printable !a
 class PrintableClass a where
     print :: a -> M ()
 instance PrintableClass String where
@@ -57,14 +57,14 @@ instance PrintableClass AExp where
     print e = interpAExp e >>= tell . show
 
 data Stmt
-    = Assign Name AExp
-    | If BExp Stmt Stmt
-    | While BExp Stmt
-    | Stmts [Stmt]
-    | Print [Printable]
+    = Assign !Name !AExp
+    | If !BExp !Stmt !Stmt
+    | While !BExp !Stmt
+    | Stmts ![Stmt]
+    | Print ![Printable]
 
 data Pgm
-    = Pgm [Name] Stmt
+    = Pgm ![Name] !Stmt
 
 storeLookup :: Name -> M Integer
 storeLookup x = do

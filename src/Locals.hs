@@ -18,9 +18,9 @@ newtype Store = Store { getStore :: M.Map Loc Integer }
     deriving Show
 
 data ImpError = ImpError
-    { env :: Env
-    , store :: Store
-    , message :: String
+    { env :: !Env
+    , store :: !Store
+    , message :: !String
     }
 
 impError :: String -> M a
@@ -30,24 +30,24 @@ impError message = do
     throwError $ ImpError { env, store, message }
 
 data AExp
-    = I Integer
-    | Var Name
-    | Negate AExp
-    | Div AExp AExp
-    | Plus AExp AExp
+    = I !Integer
+    | Var !Name
+    | Negate !AExp
+    | Div !AExp !AExp
+    | Plus !AExp !AExp
 
 data BExp
-    = B Bool
-    | Leq AExp AExp
-    | Not BExp
-    | And BExp BExp
+    = B !Bool
+    | Leq !AExp !AExp
+    | Not !BExp
+    | And !BExp !BExp
 
 data Stmt
-    = Assign Name AExp
-    | If BExp Stmt Stmt
-    | While BExp Stmt
-    | Stmts [Stmt]
-    | Declare [Name]
+    = Assign !Name !AExp
+    | If !BExp !Stmt !Stmt
+    | While !BExp !Stmt
+    | Stmts ![Stmt]
+    | Declare ![Name]
 
 alloc :: M Loc
 alloc = do
